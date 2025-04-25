@@ -5,6 +5,6 @@ It uses https://github.com/Konstanty/libmodplug to play sounds on PC speakers in
 
 Works with PMODE/W, which is included in a ZIP file in the repository.
 
-PMODE/W can handle up to 256 MB of memory, while Dos4GW only handles about 32 MB.
+PMODE/W can handle up to 256 MB of memory (needs pmwsetup.exe on your exe file), while Dos4GW only handles about 32 MB.
 
 The formats: ".amf",".abc",".pat" don't work. Look into stdafx.h to fix these formats.
