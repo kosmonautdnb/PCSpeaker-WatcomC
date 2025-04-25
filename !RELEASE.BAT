@@ -1,1 +1,1 @@
-copy r:\gltest.exe gltest.exe
+copy r:\gltest.exe xmplay.exe
