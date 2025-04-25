@@ -5,7 +5,7 @@ It uses https://github.com/Konstanty/libmodplug to play sounds on PC speakers in
 
 Libmodplug is public domain and just referenced here.
 
-Works with PMODE/W, which is included in a ZIP file in the repository.
+The source works with the public domain PMODE/W, which is included in a ZIP file in the repository.
 
 PMODE/W can handle up to 256 MB of memory (needs pmwsetup.exe on your exe file), while Dos4GW only handles about 32 MB.
 
