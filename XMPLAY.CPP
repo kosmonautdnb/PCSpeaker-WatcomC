@@ -13,14 +13,18 @@ typedef void (__interrupt __far* TimerIrqHandler)();
 
 const int HARDWARE_TIMER_FREQUENCY = 1193180; // 1193180 / 65536  = 18.2
 TimerIrqHandler oldTimerIrqHandler;
-volatile unsigned int timerIrqMultiplier = 4096; // 18.2 * 128 = 2330.43 hz (65536 must be dividable by this)
+volatile unsigned int timerIrqMultiplier = 1024; // 18.2 * 128 = 2330.43 hz (65536 must be dividable by this)
 volatile unsigned int timerIrqMulCounter = 0;
 const double baseFreq = (double)HARDWARE_TIMER_FREQUENCY / 65536 * timerIrqMultiplier;
+int resample = 1;
 
-#define SOUND_RING_BUFFER_SIZE 1024
+#define SOUND_RING_BUFFER_SIZE 32
 volatile unsigned char sound_ringbuffer[SOUND_RING_BUFFER_SIZE];
 int soundRingBufferReadPos = 0;
 int soundLastVolume = 0;
+
+unsigned char *soundBuffer;
+unsigned char *soundBuffer2;
 
 void enableTimerIrq();
 void disableTimerIrq();
@@ -31,8 +35,13 @@ bool loadMusic(const char *fileName) {
   ModPlug_Settings s;
   ModPlug_GetSettings(&s);
   s.mChannels = 1;
-  s.mFrequency = baseFreq;
+  s.mFrequency = baseFreq*resample;
   s.mBits = 8;
+  s.mFlags = MODPLUG_ENABLE_OVERSAMPLING;
+  s.mFlags |= MODPLUG_ENABLE_NOISE_REDUCTION;
+  s.mFlags |= MODPLUG_ENABLE_REVERB;
+  s.mFlags |= MODPLUG_RESAMPLE_FIR;
+
   ModPlug_SetSettings(&s);
   FILE *in = fopen(fileName,"rb");
   if (in == NULL) 
@@ -63,9 +72,9 @@ void (__interrupt __far timerIrqHandler) (void)
   vidmem[158]++;
 
   // do other timer stuff
-  int a = inp(0x61) & (~2);
+  /*int a = inp(0x61) & (~2);
   int volume = sound_ringbuffer[soundRingBufferReadPos];
-  int k = volume - soundLastVolume > 0 ? 1 : 0;
+  int k = volume > 128 ? 1 : 0;
   soundLastVolume = volume;
   outp(0x61,a|(k<<1));
   soundRingBufferReadPos++;
@@ -75,7 +84,13 @@ void (__interrupt __far timerIrqHandler) (void)
   }                                                     
   if (soundRingBufferReadPos == SOUND_RING_BUFFER_SIZE/2) {
     ModPlug_Read(xm, (void*)&sound_ringbuffer[0], SOUND_RING_BUFFER_SIZE/2);
-  }                                                     
+  }*/
+
+  int a = 0;//inp(0x61) & (~2);
+  //int k = soundBuffer[soundRingBufferReadPos+1] - soundBuffer[soundRingBufferReadPos] > 0x00 ? 1 : 0;
+  int k = soundBuffer[soundRingBufferReadPos];
+  soundRingBufferReadPos++;
+  outp(0x61,a|(k<<1));
 
   timerIrqMulCounter++;
   if (timerIrqMulCounter>=timerIrqMultiplier) {
@@ -126,14 +141,37 @@ void disableTimerIrq() {
   outp(0x40,0);
 }
 
-void main (void)         
+int main (int argc, const char *argv[])         
 {
-  if (!loadMusic("0002.XM"))
+  printf("Usage: xmplay.exe <file>\n");
+  printf("-------------------------\n");
+
+  if (!loadMusic(argc != 2 ? "0002.XM" : argv[1]))
     exit(0);
+
+  int len = (int)(baseFreq*60*6);
+  printf("%d\n",len);
+  soundBuffer = new unsigned char[len];
+  soundBuffer2 = new unsigned char[len*resample];
+  ModPlug_Read(xm, soundBuffer2, len*resample);
+  for (int i = 0; i < len-1; i++) {
+    int b = 0;
+    for (int j = 0; j < resample; j++) {
+      int k0 = soundBuffer2[i*resample+j];
+      int k1 = soundBuffer2[i*resample+j+1];
+      if (k1>k0) b++;
+      //if (k0>=0x80) b++;
+    }
+    int l = 0;
+    if (b > resample/2) l = 1;
+    soundBuffer[i] = l;
+  }
 
   enableTimerIrq();
   getch();
   disableTimerIrq();
 
   unloadMusic();
+
+  return 0;
 }
